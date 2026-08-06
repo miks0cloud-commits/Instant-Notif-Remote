@@ -9,10 +9,15 @@ const triggerBtn = document.getElementById("triggerBtn");
 const readyBtn = document.getElementById("readyBtn");
 const stopBtn = document.getElementById("stopBtn");
 
-let audioCtx = null;
-let oscillator = null;
 let isAudioActive = false;
 const connectedVisitors = [];
+
+// ------------------------------------------------------------------
+// CUSTOM AUDIO FILE SETUP
+// Make sure "alarm.mp3" is uploaded to your GitHub repository
+// ------------------------------------------------------------------
+const alarmAudio = new Audio("alarm.mp3");
+alarmAudio.loop = true; // Loops continuously until silenced
 
 // Determine role based on URL parameter (?role=host)
 const urlParams = new URLSearchParams(window.location.search);
@@ -110,9 +115,8 @@ function setupVisitor() {
   visitorControls.style.display = "block";
 
   readyBtn.addEventListener("click", async () => {
-    // 1. Activate Web Audio Context
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    audioCtx.resume();
+    // 1. Pre-load audio on user gesture
+    alarmAudio.load();
 
     // 2. Request System Pop-Up Notification & Wake Lock
     await requestNotificationPermission();
@@ -146,37 +150,26 @@ function setupVisitor() {
 }
 
 // ------------------------------------------------------------------
-// AUDIO GENERATOR
+// AUDIO FILE PLAYER
 // ------------------------------------------------------------------
 function startAlarmSound() {
   if (isAudioActive) return;
 
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-
-  oscillator = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
-
-  // Sawtooth wave for loud, distinct alarm tone
-  oscillator.type = "sawtooth";
-  oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Pitch (A5 tone)
-
-  gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-
-  oscillator.start();
-  isAudioActive = true;
-  stopBtn.style.display = "block";
+  alarmAudio.currentTime = 0; // Play from the start
+  
+  alarmAudio.play()
+    .then(() => {
+      isAudioActive = true;
+      stopBtn.style.display = "block";
+    })
+    .catch((err) => {
+      console.error("Audio playback error:", err);
+    });
 }
 
 stopBtn.addEventListener("click", () => {
-  if (oscillator) {
-    oscillator.stop();
-    oscillator.disconnect();
-    isAudioActive = false;
-    stopBtn.style.display = "none";
-  }
+  alarmAudio.pause();
+  alarmAudio.currentTime = 0;
+  isAudioActive = false;
+  stopBtn.style.display = "none";
 });
