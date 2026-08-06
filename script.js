@@ -1,5 +1,5 @@
-// Change this key to any unique string for your specific application
-const ROOM_ID = "my-unique-alarm-host-room-9982";
+// Unique channel identifier for your room
+const ROOM_ID = "github-remote-alarm-channel-7711";
 
 const statusEl = document.getElementById("status");
 const hostControls = document.getElementById("hostControls");
@@ -14,7 +14,7 @@ let oscillator = null;
 let isAudioActive = false;
 const connectedVisitors = [];
 
-// Check if user specified role via URL: e.g., site.github.io/?role=host
+// Determine role based on URL parameter (?role=host)
 const urlParams = new URLSearchParams(window.location.search);
 const isHost = urlParams.get("role") === "host";
 
@@ -25,17 +25,48 @@ if (isHost) {
 }
 
 // ------------------------------------------------------------------
-// HOST LOGIC
+// PERMISSIONS & POP-UP NOTIFICATIONS
+// ------------------------------------------------------------------
+async function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission !== "granted") {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      console.log("System notification permissions granted.");
+    }
+  }
+}
+
+function sendSystemPopUp() {
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("🚨 ALARM TRIGGERED", {
+      body: "The host has initiated a remote alarm pop-up!",
+      requireInteraction: true, // Holds pop-up on screen until dismissed
+      vibrate: [200, 100, 200, 100, 200]
+    });
+  }
+}
+
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      await navigator.wakeLock.request("screen");
+    }
+  } catch (err) {
+    console.error("Wake Lock request failed:", err);
+  }
+}
+
+// ------------------------------------------------------------------
+// HOST CONTROLLER
 // ------------------------------------------------------------------
 function setupHost() {
-  statusEl.textContent = "Initializing Host Node...";
+  statusEl.textContent = "Initializing Host Mode...";
   hostControls.style.display = "block";
 
-  // Create peer with the fixed Room ID
   const peer = new Peer(ROOM_ID);
 
   peer.on("open", () => {
-    statusEl.textContent = "Host Active! Share page URL with visitors.";
+    statusEl.textContent = "Host Active! Share your visitor URL with others.";
   });
 
   peer.on("connection", (conn) => {
@@ -51,51 +82,59 @@ function setupHost() {
 
   peer.on("error", (err) => {
     if (err.type === "unavailable-id") {
-      statusEl.textContent = "Error: Another host session is already active.";
+      statusEl.textContent = "Error: A host session is already active in another window.";
     } else {
       statusEl.textContent = "Peer Error: " + err.type;
     }
   });
 
   triggerBtn.addEventListener("click", () => {
-    // Broadcast trigger signal to all connected visitors
+    // Broadcast signal to all connected visitor devices
     connectedVisitors.forEach((conn) => {
       if (conn.open) {
         conn.send({ action: "ALARM_TRIGGER" });
       }
     });
-    // Sound local alarm for host as well
+
+    // Run local alert on host device as well
     startAlarmSound();
+    sendSystemPopUp();
   });
 }
 
 // ------------------------------------------------------------------
-// VISITOR LOGIC
+// VISITOR LISTENER
 // ------------------------------------------------------------------
 function setupVisitor() {
-  statusEl.textContent = "Visitor mode. Action required.";
+  statusEl.textContent = "Visitor mode. Permission setup required.";
   visitorControls.style.display = "block";
 
-  readyBtn.addEventListener("click", () => {
-    // Initialize Web Audio on explicit user tap
+  readyBtn.addEventListener("click", async () => {
+    // 1. Activate Web Audio Context
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     audioCtx.resume();
+
+    // 2. Request System Pop-Up Notification & Wake Lock
+    await requestNotificationPermission();
+    requestWakeLock();
 
     readyBtn.style.display = "none";
     statusEl.textContent = "Connecting to Host...";
 
-    // Connect to host peer
+    // 3. Peer Connection Setup
     const peer = new Peer();
+
     peer.on("open", () => {
       const conn = peer.connect(ROOM_ID);
 
       conn.on("open", () => {
-        statusEl.textContent = "Connected! Ready for host signals.";
+        statusEl.textContent = "Connected! Ready to receive host pop-ups.";
       });
 
       conn.on("data", (data) => {
         if (data.action === "ALARM_TRIGGER") {
           startAlarmSound();
+          sendSystemPopUp();
         }
       });
 
@@ -119,10 +158,10 @@ function startAlarmSound() {
   oscillator = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
 
+  // Sawtooth wave for loud, distinct alarm tone
   oscillator.type = "sawtooth";
-  oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Pitch
+  oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Pitch (A5 tone)
 
-  // Modulate volume continuously (pulsing siren effect)
   gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
 
   oscillator.connect(gainNode);
