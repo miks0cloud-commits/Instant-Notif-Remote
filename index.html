@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Hosted Remote Alarm</title>
+  <!-- PeerJS Library for WebRTC communication -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    .card {
+      background-color: #1e293b;
+      padding: 2.5rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      text-align: center;
+      max-width: 420px;
+      width: 90%;
+    }
+    .status {
+      margin: 1rem 0;
+      padding: 0.75rem;
+      border-radius: 6px;
+      background: #334155;
+      font-size: 0.9rem;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 1rem;
+      font-weight: bold;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-host { background-color: #ef4444; }
+    .btn-host:hover { background-color: #dc2626; }
+    .btn-visitor { background-color: #3b82f6; }
+    .btn-visitor:hover { background-color: #2563eb; }
+    .btn-stop { background-color: #64748b; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Remote Web Alarm</h2>
+    <div id="status" class="status">Connecting to peer network...</div>
+
+    <!-- Host Interface -->
+    <div id="hostControls" style="display: none;">
+      <p>Connected Visitors: <strong id="visitorCount">0</strong></p>
+      <button class="btn-host" id="triggerBtn">Sound Alarm on All Devices</button>
+    </div>
+
+    <!-- Visitor Interface -->
+    <div id="visitorControls" style="display: none;">
+      <p>Click below to ready your device for incoming remote alarms.</p>
+      <button class="btn-visitor" id="readyBtn">Enable Audio & Join Room</button>
+    </div>
+
+    <button id="stopBtn" class="btn-stop" style="display: none;">Silence Alarm</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
