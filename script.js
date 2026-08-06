@@ -12,14 +12,9 @@ const stopBtn = document.getElementById("stopBtn");
 let isAudioActive = false;
 const connectedVisitors = [];
 
-// ------------------------------------------------------------------
-// CUSTOM AUDIO FILE SETUP
-// Make sure "alarm.mp3" is uploaded to your GitHub repository
-// ------------------------------------------------------------------
 const alarmAudio = new Audio("alarm.mp3");
-alarmAudio.loop = true; // Loops continuously until silenced
+alarmAudio.loop = true;
 
-// Determine role based on URL parameter (?role=host)
 const urlParams = new URLSearchParams(window.location.search);
 const isHost = urlParams.get("role") === "host";
 
@@ -29,47 +24,11 @@ if (isHost) {
   setupVisitor();
 }
 
-// ------------------------------------------------------------------
-// ANDROID NOTIFICATION PERMISSION HANDLER
-// ------------------------------------------------------------------
-async function requestAndroidNotificationPermission() {
-  if (!("Notification" in window)) {
-    statusEl.textContent = "Web Notifications are not supported on this browser.";
-    return false;
-  }
-
-  // If already granted, proceed
-  if (Notification.permission === "granted") {
-    return true;
-  }
-
-  // If blocked, guide user to site settings
-  if (Notification.permission === "denied") {
-    alert("Notifications are blocked on Android! Tap the lock icon in Chrome's address bar to ALLOW notifications for this site.");
-    return false;
-  }
-
-  // Explicitly prompt Android user for permission
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") {
-      console.log("Android notification permission granted.");
-      return true;
-    } else {
-      alert("Permission denied. Notifications are required for remote pop-up alerts.");
-      return false;
-    }
-  } catch (err) {
-    console.error("Error requesting notification permission:", err);
-    return false;
-  }
-}
-
 function sendSystemPopUp() {
   if ("Notification" in window && Notification.permission === "granted") {
     new Notification("🚨 ALARM TRIGGERED", {
       body: "The host has initiated a remote alarm pop-up!",
-      requireInteraction: true, // Holds pop-up on screen until dismissed
+      requireInteraction: true,
       vibrate: [200, 100, 200, 100, 200]
     });
   }
@@ -81,13 +40,10 @@ async function requestWakeLock() {
       await navigator.wakeLock.request("screen");
     }
   } catch (err) {
-    console.error("Wake Lock request failed:", err);
+    console.error("Wake Lock error:", err);
   }
 }
 
-// ------------------------------------------------------------------
-// HOST CONTROLLER
-// ------------------------------------------------------------------
 function setupHost() {
   statusEl.textContent = "Initializing Host Mode...";
   hostControls.style.display = "block";
@@ -109,59 +65,51 @@ function setupHost() {
     });
   });
 
-  peer.on("error", (err) => {
-    if (err.type === "unavailable-id") {
-      statusEl.textContent = "Error: A host session is already active in another window.";
-    } else {
-      statusEl.textContent = "Peer Error: " + err.type;
-    }
-  });
-
   triggerBtn.addEventListener("click", () => {
-    // Broadcast signal to all connected visitor devices
     connectedVisitors.forEach((conn) => {
       if (conn.open) {
         conn.send({ action: "ALARM_TRIGGER" });
       }
     });
 
-    // Run local alert on host device as well
     startAlarmSound();
     sendSystemPopUp();
   });
 }
 
-// ------------------------------------------------------------------
-// VISITOR LISTENER
-// ------------------------------------------------------------------
 function setupVisitor() {
-  statusEl.textContent = "Visitor mode. Permission setup required.";
+  statusEl.textContent = "Visitor mode. Tap button to activate.";
   visitorControls.style.display = "block";
 
   readyBtn.addEventListener("click", async () => {
-    // 1. Pre-load audio on user gesture for Android Chrome compatibility
     alarmAudio.load();
-
-    // 2. Request Android System Notification & Keep Screen Awake
-    const granted = await requestAndroidNotificationPermission();
     requestWakeLock();
 
-    if (!granted && Notification.permission === "denied") {
-      statusEl.textContent = "Permission denied. Enable notifications in Chrome settings.";
-      return;
+    // DIAGNOSTIC CHECK FOR ANDROID
+    if (!("Notification" in window)) {
+      alert("This browser does not support Web Notifications.");
+    } else if (Notification.permission === "denied") {
+      alert("Android blocked notifications for this site! Tap the lock icon in the address bar to switch Notifications to ALLOW.");
+    } else if (Notification.permission === "default") {
+      // Direct sync request for Android Chrome
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        alert("Permission was not granted.");
+      }
+    } else if (Notification.permission === "granted") {
+      alert("Notifications are ALREADY allowed!");
     }
 
     readyBtn.style.display = "none";
     statusEl.textContent = "Connecting to Host...";
 
-    // 3. Peer Connection Setup
     const peer = new Peer();
 
     peer.on("open", () => {
       const conn = peer.connect(ROOM_ID);
 
       conn.on("open", () => {
-        statusEl.textContent = "Connected! Ready to receive host pop-ups.";
+        statusEl.textContent = "Connected! Ready for host alarms.";
       });
 
       conn.on("data", (data) => {
@@ -178,13 +126,10 @@ function setupVisitor() {
   });
 }
 
-// ------------------------------------------------------------------
-// AUDIO FILE PLAYER
-// ------------------------------------------------------------------
 function startAlarmSound() {
   if (isAudioActive) return;
 
-  alarmAudio.currentTime = 0; // Play from the start
+  alarmAudio.currentTime = 0;
   
   alarmAudio.play()
     .then(() => {
@@ -192,7 +137,7 @@ function startAlarmSound() {
       stopBtn.style.display = "block";
     })
     .catch((err) => {
-      console.error("Audio playback error:", err);
+      console.error("Audio error:", err);
     });
 }
 
