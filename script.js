@@ -30,14 +30,38 @@ if (isHost) {
 }
 
 // ------------------------------------------------------------------
-// PERMISSIONS & POP-UP NOTIFICATIONS
+// ANDROID NOTIFICATION PERMISSION HANDLER
 // ------------------------------------------------------------------
-async function requestNotificationPermission() {
-  if ("Notification" in window && Notification.permission !== "granted") {
+async function requestAndroidNotificationPermission() {
+  if (!("Notification" in window)) {
+    statusEl.textContent = "Web Notifications are not supported on this browser.";
+    return false;
+  }
+
+  // If already granted, proceed
+  if (Notification.permission === "granted") {
+    return true;
+  }
+
+  // If blocked, guide user to site settings
+  if (Notification.permission === "denied") {
+    alert("Notifications are blocked on Android! Tap the lock icon in Chrome's address bar to ALLOW notifications for this site.");
+    return false;
+  }
+
+  // Explicitly prompt Android user for permission
+  try {
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
-      console.log("System notification permissions granted.");
+      console.log("Android notification permission granted.");
+      return true;
+    } else {
+      alert("Permission denied. Notifications are required for remote pop-up alerts.");
+      return false;
     }
+  } catch (err) {
+    console.error("Error requesting notification permission:", err);
+    return false;
   }
 }
 
@@ -115,12 +139,17 @@ function setupVisitor() {
   visitorControls.style.display = "block";
 
   readyBtn.addEventListener("click", async () => {
-    // 1. Pre-load audio on user gesture
+    // 1. Pre-load audio on user gesture for Android Chrome compatibility
     alarmAudio.load();
 
-    // 2. Request System Pop-Up Notification & Wake Lock
-    await requestNotificationPermission();
+    // 2. Request Android System Notification & Keep Screen Awake
+    const granted = await requestAndroidNotificationPermission();
     requestWakeLock();
+
+    if (!granted && Notification.permission === "denied") {
+      statusEl.textContent = "Permission denied. Enable notifications in Chrome settings.";
+      return;
+    }
 
     readyBtn.style.display = "none";
     statusEl.textContent = "Connecting to Host...";
